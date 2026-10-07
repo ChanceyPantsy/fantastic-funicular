@@ -37,6 +37,8 @@ pub enum SourceKind {
     Trigger(TriggerKind),
     /// Explosion from breaking an elemental shield with its own element.
     ShieldBreak,
+    /// Damage from an aspect's passive.
+    Aspect,
     Environment,
 }
 
@@ -143,10 +145,12 @@ pub fn calculate(
 ) -> DamageCalc {
     let rules = &cfg.statuses;
     let outgoing_mult = attacker.map_or(1.0, |a| {
-        let mods = a.modifiers.iter().map(|m| (m, 1)).chain(a.statuses.outgoing(rules));
+        let own = a.modifiers.iter().filter(|m| m.category.is_outgoing());
+        let mods = own.map(|m| (m, 1)).chain(a.statuses.outgoing(rules));
         buffs::resolve(mods, &inst.kind, inst.damage_type, &cfg.stacking)
     });
-    let incoming_mods = target.modifiers.iter().map(|m| (m, 1)).chain(target.statuses.incoming(rules));
+    let own = target.modifiers.iter().filter(|m| !m.category.is_outgoing());
+    let incoming_mods = own.map(|m| (m, 1)).chain(target.statuses.incoming(rules));
     let incoming_mult = buffs::resolve(incoming_mods, &inst.kind, inst.damage_type, &cfg.stacking);
     let stat_mult = 1.0 + attacker.map_or(0.0, |a| stat_bonus(&inst.kind, a, target.rank, cfg));
     let rank_mult = cfg.ranks.mult(target.rank);
@@ -208,6 +212,23 @@ mod tests {
         assert_eq!(calculate(&hit, None, &t, &cfg).champion_mult, 0.5);
         t.champion.as_mut().unwrap().stunned = 1.0;
         assert_eq!(calculate(&hit, None, &t, &cfg).champion_mult, 1.0);
+    }
+
+    #[test]
+    fn own_resist_does_not_reduce_damage_dealt() {
+        let cfg = SandboxConfig::pve();
+        let a = Combatant::enemy("a", Team(0), Rank::Guardian, 100.0).with_modifier(Modifier::resist(
+            "super",
+            ModifierScope::All,
+            0.5,
+        ));
+        let t = Combatant::enemy("t", Team(1), Rank::Minor, 100.0).with_modifier(Modifier::empowering(
+            "t's buff",
+            ModifierScope::All,
+            1.0,
+        ));
+        assert_eq!(calculate(&weapon_hit(10.0), Some(&a), &t, &cfg).final_amount, 10.0);
+        assert_eq!(calculate(&weapon_hit(10.0), Some(&t), &a, &cfg).final_amount, 10.0);
     }
 
     #[test]

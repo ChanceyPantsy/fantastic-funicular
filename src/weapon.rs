@@ -243,6 +243,21 @@ impl Weapon {
         true
     }
 
+    /// Fills the magazine immediately from reserves (and cancels a reload).
+    pub fn instant_reload(&mut self) {
+        self.reload_remaining = None;
+        let need = self.def.magazine - self.magazine;
+        let got = match &mut self.reserves {
+            None => need,
+            Some(r) => {
+                let got = need.min(*r);
+                *r -= got;
+                got
+            }
+        };
+        self.magazine += got;
+    }
+
     /// Adds spare ammo up to `cap`.
     pub fn add_reserves(&mut self, amount: u32, cap: u32) {
         if let Some(r) = &mut self.reserves {
@@ -258,17 +273,7 @@ impl Weapon {
         if *left > 0.0 {
             return false;
         }
-        self.reload_remaining = None;
-        let need = self.def.magazine - self.magazine;
-        let got = match &mut self.reserves {
-            None => need,
-            Some(r) => {
-                let got = need.min(*r);
-                *r -= got;
-                got
-            }
-        };
-        self.magazine += got;
+        self.instant_reload();
         true
     }
 }

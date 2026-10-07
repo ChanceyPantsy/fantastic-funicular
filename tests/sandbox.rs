@@ -102,7 +102,8 @@ fn jolt_chains_to_at_most_three_others() {
 #[test]
 fn slow_freezes_and_frozen_shatters() {
     let mut sb = Sandbox::default();
-    let p = sb.spawn(guardian(&sb, StatBlock::default()).with_ability(ability::presets::coldsnap_grenade()));
+    let p =
+        sb.spawn(guardian(&sb, StatBlock::default()).with_ability(catalog::ability_named("Coldsnap Grenade").unwrap()));
     let a = sb.spawn(enemy(5000.0, 10.0).with_weapon(weapon::presets::auto_rifle_600(DamageType::Kinetic)));
     sb.use_ability(p, AbilitySlot::Grenade, Some(a)).unwrap();
     assert!(sb.get(a).unwrap().statuses.has(StatusKind::Frozen));
@@ -192,7 +193,7 @@ fn kills_drop_orbs_and_orbs_give_energy() {
     let p = sb.spawn(
         guardian(&sb, StatBlock::new(0, 100, 0, 0, 0, 0))
             .with_weapon(weapon::presets::sniper_72(DamageType::Kinetic))
-            .with_ability(ability::presets::vortex_grenade()),
+            .with_ability(catalog::ability_named("Vortex Grenade").unwrap()),
     );
     let major = sb.spawn(Combatant::enemy("Knight", ENEMIES, Rank::Major, 100.0).at([5.0, 0.0, 0.0]));
     sb.use_ability(p, AbilitySlot::Grenade, None).unwrap();
@@ -222,14 +223,18 @@ fn devour_heals_on_kill() {
 #[test]
 fn abilities_regenerate_faster_with_stats_and_respect_suppress() {
     let mut sb = Sandbox::default();
-    let slow = sb.spawn(guardian(&sb, StatBlock::default()).with_ability(ability::presets::pulse_grenade()));
-    let fast =
-        sb.spawn(guardian(&sb, StatBlock::new(0, 0, 0, 100, 0, 0)).with_ability(ability::presets::pulse_grenade()));
+    let slow =
+        sb.spawn(guardian(&sb, StatBlock::default()).with_ability(catalog::ability_named("Pulse Grenade").unwrap()));
+    let fast = sb.spawn(
+        guardian(&sb, StatBlock::new(0, 0, 0, 100, 0, 0))
+            .with_ability(catalog::ability_named("Pulse Grenade").unwrap()),
+    );
     for id in [slow, fast] {
         sb.use_ability(id, AbilitySlot::Grenade, None).unwrap();
         assert_eq!(sb.use_ability(id, AbilitySlot::Grenade, None), Err(ActionError::NotReady));
     }
-    for _ in 0..40 {
+    // 105s base cooldown: 42s at Grenade 100 (x2.5), 105s at 0.
+    for _ in 0..50 {
         sb.tick(1.0);
     }
     assert!(sb.get(fast).unwrap().loadout.grenade.as_ref().unwrap().is_ready());
@@ -254,7 +259,9 @@ fn rocket_splash_hits_nearby_enemies() {
 #[test]
 fn damage_earns_super_energy() {
     let mut sb = Sandbox::default();
-    let p = sb.spawn(guardian(&sb, StatBlock::default()).with_ability(ability::presets::nova_bomb()));
+    let p = sb.spawn(
+        guardian(&sb, StatBlock::default()).with_ability(catalog::ability_named("Nova Bomb: Cataclysm").unwrap()),
+    );
     let e = sb.spawn(enemy(1_000_000.0, 10.0));
     sb.deal_damage(e, DamageInstance::new(10_000.0, DamageType::Kinetic, SourceKind::Environment).from(p));
     let energy = sb.get(p).unwrap().loadout.super_.as_ref().unwrap().energy;

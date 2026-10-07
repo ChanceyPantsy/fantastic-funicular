@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::ability::{AbilityDef, Loadout};
 use crate::buffs::Modifier;
+use crate::effect::{ActiveSuper, AspectDef, AspectState};
 use crate::element::{DamageType, GuardianClass};
 use crate::health::{HealthPool, Regen};
 use crate::stats::{StatBlock, StatRules};
@@ -199,10 +200,15 @@ pub struct Combatant {
     pub weapons: Vec<Weapon>,
     pub active_weapon: usize,
     /// Buffs, debuffs and perks not tied to a status (timed or permanent).
+    /// Empowering, Surge and Multiplicative modifiers affect damage this
+    /// combatant deals; Debuff and Resist modifiers affect damage it takes.
     pub modifiers: Vec<Modifier>,
     /// World position, synced by the host. Needed for area effects to hit
     /// anything but their primary target.
     pub position: Option<[f32; 3]>,
+    pub aspects: Vec<AspectState>,
+    /// The roaming super currently active, if any.
+    pub super_mode: Option<ActiveSuper>,
 }
 
 impl Combatant {
@@ -222,6 +228,8 @@ impl Combatant {
             active_weapon: 0,
             modifiers: Vec::new(),
             position: None,
+            aspects: Vec::new(),
+            super_mode: None,
         }
     }
 
@@ -260,6 +268,24 @@ impl Combatant {
     pub fn with_modifier(mut self, m: Modifier) -> Self {
         self.modifiers.push(m);
         self
+    }
+
+    /// Equips an aspect: its modifiers become permanent, its passives arm.
+    pub fn with_aspect(mut self, def: AspectDef) -> Self {
+        self.modifiers.extend(def.modifiers.iter().cloned());
+        self.aspects.push(AspectState::new(def));
+        self
+    }
+
+    /// Adds a modifier, replacing any existing one with the same name
+    /// (so re-applying a buff refreshes it rather than stacking it).
+    pub fn refresh_modifier(&mut self, m: Modifier) {
+        self.modifiers.retain(|x| x.name != m.name);
+        self.modifiers.push(m);
+    }
+
+    pub fn in_super(&self) -> bool {
+        self.super_mode.is_some()
     }
 
     pub fn as_champion(mut self, kind: ChampionKind) -> Self {

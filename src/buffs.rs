@@ -27,6 +27,14 @@ pub enum ModifierCategory {
     Resist,
 }
 
+impl ModifierCategory {
+    /// Whether a modifier of this category held by a combatant affects the
+    /// damage it deals (`true`) or the damage it takes (`false`).
+    pub fn is_outgoing(self) -> bool {
+        matches!(self, ModifierCategory::Empowering | ModifierCategory::Surge | ModifierCategory::Multiplicative)
+    }
+}
+
 /// What kind of damage a modifier affects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

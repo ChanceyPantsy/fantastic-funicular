@@ -5,8 +5,8 @@
 //! charge. Energy comes from passive regeneration (scaled by the matching
 //! stat), Orbs of Power, and for supers, from dealing damage and getting kills.
 
+use crate::effect::{Effect, RoamingSuper};
 use crate::element::DamageType;
-use crate::status::StatusKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -26,41 +26,70 @@ impl AbilitySlot {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AbilityDef {
     pub name: String,
+    pub description: String,
     pub slot: AbilitySlot,
     pub damage_type: DamageType,
     /// Seconds to regenerate one charge at a regen multiplier of 1.0.
     pub base_cooldown: f32,
     pub max_charges: u32,
-    /// Damage to the target (0 for utility abilities).
-    pub damage: f32,
-    /// If above 0, the damage also hits other hostiles within this radius
-    /// of the target.
-    pub radius: f32,
-    /// Statuses applied to whoever the damage hits, as `(status, stacks)`.
-    pub on_hit: Vec<(StatusKind, u32)>,
-    /// Statuses applied to the user on cast (e.g. Woven Mail, Radiant).
-    pub on_self: Vec<(StatusKind, u32)>,
-    /// Overshield granted to the user on cast.
-    pub overshield: f32,
-    /// Health restored to the user on cast.
-    pub heal: f32,
+    /// How far away the host should let the user target (melee ~4,
+    /// grenades ~20).
+    pub range: f32,
+    /// What happens on cast, in order.
+    pub effects: Vec<Effect>,
 }
 
 impl AbilityDef {
     pub fn new(name: impl Into<String>, slot: AbilitySlot, damage_type: DamageType, base_cooldown: f32) -> Self {
+        let range = match slot {
+            AbilitySlot::Melee => 4.0,
+            AbilitySlot::Grenade => 20.0,
+            AbilitySlot::ClassAbility => 0.0,
+            AbilitySlot::Super => 25.0,
+        };
         Self {
             name: name.into(),
+            description: String::new(),
             slot,
             damage_type,
             base_cooldown,
             max_charges: 1,
-            damage: 0.0,
-            radius: 0.0,
-            on_hit: Vec::new(),
-            on_self: Vec::new(),
-            overshield: 0.0,
-            heal: 0.0,
+            range,
+            effects: Vec::new(),
         }
+    }
+
+    pub fn describe(mut self, text: impl Into<String>) -> Self {
+        self.description = text.into();
+        self
+    }
+
+    pub fn charges(mut self, n: u32) -> Self {
+        self.max_charges = n;
+        self
+    }
+
+    pub fn range(mut self, r: f32) -> Self {
+        self.range = r;
+        self
+    }
+
+    pub fn effect(mut self, e: Effect) -> Self {
+        self.effects.push(e);
+        self
+    }
+
+    /// Whether any effect needs a target to do something.
+    pub fn is_targeted(&self) -> bool {
+        self.effects.iter().any(Effect::needs_target)
+    }
+
+    /// The roaming super this ability starts, if any.
+    pub fn roaming(&self) -> Option<&RoamingSuper> {
+        self.effects.iter().find_map(|e| match e {
+            Effect::Roam(r) => Some(r),
+            _ => None,
+        })
     }
 }
 
@@ -180,112 +209,17 @@ impl Loadout {
     }
 }
 
-/// Example abilities, one or two per element. Approximate values.
-pub mod presets {
-    use super::*;
-
-    pub fn incendiary_grenade() -> AbilityDef {
-        AbilityDef {
-            damage: 80.0,
-            radius: 4.0,
-            on_hit: vec![(StatusKind::Scorch, 60)],
-            ..AbilityDef::new("Incendiary Grenade", AbilitySlot::Grenade, DamageType::Solar, 90.0)
-        }
-    }
-
-    pub fn pulse_grenade() -> AbilityDef {
-        AbilityDef {
-            damage: 90.0,
-            radius: 4.0,
-            on_hit: vec![(StatusKind::Jolt, 1)],
-            ..AbilityDef::new("Pulse Grenade", AbilitySlot::Grenade, DamageType::Arc, 90.0)
-        }
-    }
-
-    pub fn vortex_grenade() -> AbilityDef {
-        AbilityDef {
-            damage: 110.0,
-            radius: 4.0,
-            on_hit: vec![(StatusKind::Volatile, 1)],
-            ..AbilityDef::new("Vortex Grenade", AbilitySlot::Grenade, DamageType::Void, 105.0)
-        }
-    }
-
-    pub fn coldsnap_grenade() -> AbilityDef {
-        AbilityDef {
-            damage: 40.0,
-            on_hit: vec![(StatusKind::Slow, 100)],
-            ..AbilityDef::new("Coldsnap Grenade", AbilitySlot::Grenade, DamageType::Stasis, 105.0)
-        }
-    }
-
-    pub fn grapple_grenade() -> AbilityDef {
-        AbilityDef { max_charges: 2, ..AbilityDef::new("Grapple", AbilitySlot::Grenade, DamageType::Strand, 60.0) }
-    }
-
-    pub fn shield_throw() -> AbilityDef {
-        AbilityDef {
-            damage: 70.0,
-            max_charges: 1,
-            on_hit: vec![(StatusKind::Weaken, 1)],
-            on_self: vec![],
-            overshield: 40.0,
-            ..AbilityDef::new("Shield Throw", AbilitySlot::Melee, DamageType::Void, 70.0)
-        }
-    }
-
-    pub fn threaded_spike() -> AbilityDef {
-        AbilityDef {
-            damage: 70.0,
-            on_hit: vec![(StatusKind::Sever, 1)],
-            ..AbilityDef::new("Threaded Spike", AbilitySlot::Melee, DamageType::Strand, 70.0)
-        }
-    }
-
-    pub fn healing_rift() -> AbilityDef {
-        AbilityDef {
-            on_self: vec![(StatusKind::Restoration, 2)],
-            ..AbilityDef::new("Healing Rift", AbilitySlot::ClassAbility, DamageType::Solar, 80.0)
-        }
-    }
-
-    pub fn gambler_dodge() -> AbilityDef {
-        AbilityDef::new("Gambler's Dodge", AbilitySlot::ClassAbility, DamageType::Kinetic, 45.0)
-    }
-
-    pub fn towering_barricade() -> AbilityDef {
-        AbilityDef {
-            on_self: vec![(StatusKind::Radiant, 1)],
-            ..AbilityDef::new("Towering Barricade", AbilitySlot::ClassAbility, DamageType::Solar, 60.0)
-        }
-    }
-
-    pub fn nova_bomb() -> AbilityDef {
-        AbilityDef {
-            damage: 3000.0,
-            radius: 7.0,
-            on_hit: vec![(StatusKind::Volatile, 1)],
-            ..AbilityDef::new("Nova Bomb", AbilitySlot::Super, DamageType::Void, 450.0)
-        }
-    }
-
-    pub fn thundercrash() -> AbilityDef {
-        AbilityDef {
-            damage: 4000.0,
-            radius: 6.0,
-            on_hit: vec![(StatusKind::Jolt, 1)],
-            ..AbilityDef::new("Thundercrash", AbilitySlot::Super, DamageType::Arc, 450.0)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn grapple() -> AbilityDef {
+        AbilityDef::new("Grapple", AbilitySlot::Grenade, DamageType::Strand, 60.0).charges(2)
+    }
+
     #[test]
     fn regenerates_into_charges() {
-        let mut a = AbilityState::new(presets::grapple_grenade());
+        let mut a = AbilityState::new(grapple());
         assert!(a.consume() && a.consume());
         assert!(!a.consume());
         assert_eq!(a.tick(30.0, 1.0), 0);
@@ -297,7 +231,7 @@ mod tests {
 
     #[test]
     fn energy_overflow_spills_into_next_charge() {
-        let mut a = AbilityState::new(presets::grapple_grenade());
+        let mut a = AbilityState::new(grapple());
         a.consume();
         a.consume();
         assert_eq!(a.add_energy(1.5), 1);
@@ -307,8 +241,8 @@ mod tests {
     #[test]
     fn supers_start_empty() {
         let mut l = Loadout::default();
-        l.equip(presets::nova_bomb());
-        l.equip(presets::vortex_grenade());
+        l.equip(AbilityDef::new("Nova Bomb", AbilitySlot::Super, DamageType::Void, 450.0));
+        l.equip(AbilityDef::new("Vortex Grenade", AbilitySlot::Grenade, DamageType::Void, 105.0));
         assert!(!l.get(AbilitySlot::Super).unwrap().is_ready());
         assert!(l.get(AbilitySlot::Grenade).unwrap().is_ready());
         assert!(l.get(AbilitySlot::Melee).is_none());

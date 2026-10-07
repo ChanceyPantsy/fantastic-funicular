@@ -23,7 +23,7 @@
 //!         StatBlock::new(100, 50, 50, 100, 50, 50),
 //!         &sb.config.guardian, &sb.config.stats)
 //!     .with_weapon(weapon::presets::hand_cannon_140(DamageType::Solar))
-//!     .with_ability(ability::presets::incendiary_grenade()),
+//!     .with_ability(catalog::ability_named("Incendiary Grenade").unwrap()),
 //! );
 //! let enemy = sb.spawn(
 //!     Combatant::enemy("Acolyte", Team(1), Rank::Minor, 250.0)
@@ -43,9 +43,11 @@
 
 pub mod ability;
 pub mod buffs;
+pub mod catalog;
 pub mod combatant;
 pub mod config;
 pub mod damage;
+pub mod effect;
 pub mod element;
 pub mod health;
 pub mod sandbox;
@@ -55,14 +57,16 @@ pub mod weapon;
 
 /// Everything most hosts need.
 pub mod prelude {
-    pub use crate::ability::{self, AbilityDef, AbilitySlot, AbilityState, Loadout};
+    pub use crate::ability::{AbilityDef, AbilitySlot, AbilityState, Loadout};
     pub use crate::buffs::{Modifier, ModifierCategory, ModifierScope};
+    pub use crate::catalog::{self, SubclassKit};
     pub use crate::combatant::{ChampionKind, Combatant, CombatantId, Rank, Team};
     pub use crate::config::{GameMode, SandboxConfig};
     pub use crate::damage::{DamageInstance, SourceKind};
+    pub use crate::effect::{AspectDef, Effect, MoveKind};
     pub use crate::element::{DamageType, GuardianClass, SubclassElement};
     pub use crate::health::HealthPool;
-    pub use crate::sandbox::{ActionError, CombatEvent, Sandbox, Shot};
+    pub use crate::sandbox::{AbilityTarget, ActionError, CombatEvent, Sandbox, Shot};
     pub use crate::stats::{Stat, StatBlock};
     pub use crate::status::{StatusKind, TriggerKind};
     pub use crate::weapon::{self, AmmoType, WeaponArchetype, WeaponDef};

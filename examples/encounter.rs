@@ -23,9 +23,9 @@ fn main() {
             &sb.config.stats,
         )
         .with_weapon(hc)
-        .with_ability(ability::presets::incendiary_grenade())
-        .with_ability(ability::presets::healing_rift())
-        .with_ability(ability::presets::nova_bomb())
+        .with_ability(catalog::ability_named("Incendiary Grenade").unwrap())
+        .with_ability(catalog::ability_named("Healing Rift").unwrap())
+        .with_ability(catalog::ability_named("Nova Bomb: Cataclysm").unwrap())
         .at([0.0, 0.0, 0.0]),
     );
 
