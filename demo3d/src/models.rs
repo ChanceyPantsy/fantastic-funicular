@@ -34,13 +34,13 @@ impl ModelKind {
 
     fn path(self) -> &'static str {
         match self {
-            ModelKind::Knight => "models/Knight.glb",
-            ModelKind::Rogue => "models/Rogue_Hooded.glb",
-            ModelKind::Mage => "models/Mage.glb",
-            ModelKind::Minion => "models/Skeleton_Minion.glb",
-            ModelKind::SkeletonRogue => "models/Skeleton_Rogue.glb",
-            ModelKind::SkeletonMage => "models/Skeleton_Mage.glb",
-            ModelKind::SkeletonWarrior => "models/Skeleton_Warrior.glb",
+            ModelKind::Knight => "embedded://models/Knight.glb",
+            ModelKind::Rogue => "embedded://models/Rogue_Hooded.glb",
+            ModelKind::Mage => "embedded://models/Mage.glb",
+            ModelKind::Minion => "embedded://models/Skeleton_Minion.glb",
+            ModelKind::SkeletonRogue => "embedded://models/Skeleton_Rogue.glb",
+            ModelKind::SkeletonMage => "embedded://models/Skeleton_Mage.glb",
+            ModelKind::SkeletonWarrior => "embedded://models/Skeleton_Warrior.glb",
         }
     }
 
@@ -72,11 +72,11 @@ impl Prop {
 
     fn path(self) -> &'static str {
         match self {
-            Prop::Crossbow => "models/Skeleton_Crossbow.gltf",
-            Prop::Blade => "models/Skeleton_Blade.gltf",
-            Prop::Staff => "models/Skeleton_Staff.gltf",
-            Prop::Axe => "models/Skeleton_Axe.gltf",
-            Prop::Shield => "models/Skeleton_Shield_Large_A.gltf",
+            Prop::Crossbow => "embedded://models/Skeleton_Crossbow.gltf",
+            Prop::Blade => "embedded://models/Skeleton_Blade.gltf",
+            Prop::Staff => "embedded://models/Skeleton_Staff.gltf",
+            Prop::Axe => "embedded://models/Skeleton_Axe.gltf",
+            Prop::Shield => "embedded://models/Skeleton_Shield_Large_A.gltf",
         }
     }
 }
@@ -125,8 +125,41 @@ impl Rig {
 
 pub struct ModelsPlugin;
 
+/// The models ship inside the binary, so the game is one file to host.
+macro_rules! embed {
+    ($app:expr, $($name:literal),* $(,)?) => {{
+        let registry = $app.world_mut().resource_mut::<bevy::asset::io::embedded::EmbeddedAssetRegistry>();
+        $(registry.insert_asset(
+            std::path::PathBuf::new(),
+            std::path::Path::new(concat!("models/", $name)),
+            include_bytes!(concat!("../assets/models/", $name)).as_slice(),
+        );)*
+    }};
+}
+
 impl Plugin for ModelsPlugin {
     fn build(&self, app: &mut App) {
+        embed!(
+            app,
+            "Knight.glb",
+            "Rogue_Hooded.glb",
+            "Mage.glb",
+            "Skeleton_Minion.glb",
+            "Skeleton_Rogue.glb",
+            "Skeleton_Mage.glb",
+            "Skeleton_Warrior.glb",
+            "Skeleton_Crossbow.gltf",
+            "Skeleton_Crossbow.bin",
+            "Skeleton_Blade.gltf",
+            "Skeleton_Blade.bin",
+            "Skeleton_Staff.gltf",
+            "Skeleton_Staff.bin",
+            "Skeleton_Axe.gltf",
+            "Skeleton_Axe.bin",
+            "Skeleton_Shield_Large_A.gltf",
+            "Skeleton_Shield_Large_A.bin",
+            "skeleton_texture.png",
+        );
         app.add_systems(Startup, start_loading)
             .add_systems(Update, finish_loading.run_if(in_state(AppState::Loading)))
             .add_systems(Update, tick_oneshots);

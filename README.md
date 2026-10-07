@@ -157,7 +157,8 @@ heavy), 1/2/3 weapons, R reload, Esc release the mouse, L loadout.
 
 Characters and animations are [KayKit](https://kaylousberg.com) packs by Kay
 Lousberg (CC0); `demo3d/tools/prepare_assets.sh` rebuilds the trimmed copies
-in `demo3d/assets/models`. The HUD font is Chakra Petch (SIL Open Font
+in `demo3d/assets/models`, which are embedded in the binary, so the browser
+build is just a page, one gzipped module and a font. The HUD font is Chakra Petch (SIL Open Font
 License). Guns, the arena and all effects are built in code.
 
 ## Examples

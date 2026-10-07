@@ -234,7 +234,7 @@ $("resume").onclick = () => { hidePicker(); canvas.requestPointerLock?.()?.catch
 
 // ---- Boot: download the gzipped module with progress, then start Bevy ----
 try {
-  const res = await fetch("guardian_strike_bg.wasm.gz");
+  const res = await fetch("guardian_strike.wasm");
   if (!res.ok) throw new Error("couldn't download the game (" + res.status + ")");
   const total = +res.headers.get("content-length") || 0;
   let got = 0;

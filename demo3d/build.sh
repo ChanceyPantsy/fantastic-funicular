@@ -22,8 +22,10 @@ if [ "$PROFILE" = "release" ] && [ -n "$OPT" ]; then
     --enable-mutable-globals --enable-reference-types --enable-multivalue "$WASM" -o "$WASM.opt"
   mv "$WASM.opt" "$WASM"
 fi
-# Ship the module gzipped; the page decompresses it with DecompressionStream.
-gzip -9 -c "$WASM" > "$OUT/guardian_strike_bg.wasm.gz" && rm "$WASM"
-cp -r demo3d/assets "$OUT/assets"
+# Ship the module gzipped (still named .wasm so any static host serves it);
+# the page sees the gzip header and decompresses it with DecompressionStream.
+gzip -9 -c "$WASM" > "$OUT/guardian_strike.wasm" && rm "$WASM"
+# Models are embedded in the binary; only the font is loaded from disk.
+mkdir -p "$OUT/assets" && cp -r demo3d/assets/fonts "$OUT/assets/fonts"
 cp demo3d/web/index.html "$OUT/index.html"
 ls -la "$OUT"
