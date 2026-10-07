@@ -241,7 +241,12 @@ try {
   const counted = res.body.pipeThrough(new TransformStream({
     transform(chunk, ctl) { got += chunk.byteLength; if (total) $("bar").style.width = (100 * got / total) + "%"; ctl.enqueue(chunk); },
   }));
-  const bytes = await new Response(counted.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+  let bytes = await new Response(counted).arrayBuffer();
+  // Decompress unless the server already did (gzip files start with 1f 8b).
+  const head = new Uint8Array(bytes, 0, 2);
+  if (head[0] === 0x1f && head[1] === 0x8b) {
+    bytes = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+  }
   $("bar").style.width = "100%";
   $("loadText").textContent = "Loading models and shaders…";
   try { await init({ module_or_path: bytes }); }
