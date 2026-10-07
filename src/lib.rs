@@ -10,7 +10,8 @@
 //! do rendering, physics or hit detection. Your engine reports hits; the
 //! sandbox works out what they do.
 //!
-//! All numbers live in [`SandboxConfig`](config::SandboxConfig) and are approximations meant as a
+//! Every class and subclass ability is in [`catalog`]. All numbers live in
+//! [`SandboxConfig`](config::SandboxConfig) and are approximations meant as a
 //! starting point. Change them in code, or enable the `serde` feature and
 //! load them from a data file.
 //!

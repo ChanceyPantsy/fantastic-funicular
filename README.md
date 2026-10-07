@@ -26,6 +26,8 @@ hit does.
 | `buffs` | Damage buff stacking: **Empowering** and **Debuff** take only the strongest, **Surges** add up to a cap, **Multiplicative** perks multiply, **Resist** values multiply up to a cap |
 | `status` | Scorch → **Ignite**, Jolt chain lightning, Blind, Amplified, Volatile explosions, Weaken, Suppress, Devour, Invisible, Slow → **Freeze** → **Shatter**, Frost Armor, Sever, Suspend, Unravel threads, Woven Mail, Radiant, Restoration. PvE and PvP tuning tables |
 | `health` | Overshield → shield → health; elemental shields (a matching element breaks them faster and causes a break explosion); regeneration delay; health refills before shield |
+| `effect` | What abilities do, as data: blasts, lingering zones (rifts, wells, bubbles, barricades, storms), seekers, chain lightning, buffs, heals, energy refunds, movement requests, and roaming supers with light/heavy attacks. Aspects are passives that fire on kills, casts, applied statuses and triggers |
+| `catalog` | All 3 classes × 6 subclasses (Arc, Solar, Void, Stasis, Strand, Prismatic): 29 supers, 27 grenades, 25 melees, 9 class abilities and 46 aspects |
 | `weapon` | 17 archetypes and their ammo types; RPM, precision multiplier, pellets, charge time, falloff, magazine/reserves/reload, splash damage; shots-to-kill, TTK and best crit/body mix; preset weapons |
 | `ability` | Grenade / melee / class / super energy, charges, stat-scaled cooldowns; preset abilities for each element |
 | `combatant` | Guardians and enemies, ranks (Minor → Boss), teams, **champions** (Barrier, Overload, Unstoppable) with stuns and re-stun immunity |
@@ -94,7 +96,7 @@ for event in sb.events() {
   and call `tick` in your update loop.
 * **Godot:** wrap `Sandbox` in a `godot-rust` (gdext) node.
 * **Unity / Unreal / C# / C++ mods:** build a `cdylib` with a small `extern "C"`
-  layer over `Sandbox` (not included yet).
+  layer over `Sandbox`. `demo/src/lib.rs` is a working example of one.
 * **Data-driven mods:** enable `serde` and ship weapons, abilities and a
   `SandboxConfig` as JSON so they can be retuned without recompiling (see
   `tests/serde.rs`).
@@ -102,6 +104,22 @@ for event in sb.events() {
 Area effects (Ignite, Jolt chains, Volatile, Shatter, splash, shield breaks)
 only reach other combatants that have a `position`. Without one, an effect
 hits only its primary target.
+
+## Playable demo
+
+`demo/` is **Guardian Arena**, a small top-down wave shooter that runs the
+crate in the browser through WebAssembly. Pick any class, subclass, super,
+grenade, melee, class ability and two aspects, then fight waves of Hive,
+shielded Knights, all three champion types and an Ogre boss.
+
+```sh
+./demo/build.sh                          # builds demo/web/guardian_arena.wasm
+python3 -m http.server -d demo/web 8080  # then open http://localhost:8080
+```
+
+The demo talks to Rust through a plain C ABI (`demo/src/lib.rs`): no
+wasm-bindgen, just `extern "C"` functions plus JSON in and out. A Unity,
+Unreal or Godot plugin can use the same interface.
 
 ## Examples
 
@@ -113,15 +131,18 @@ cargo run --example encounter   # a scripted PvE fight with an event log
 ## Development
 
 ```sh
-cargo test --all-features
-cargo clippy --all-targets --all-features
+cargo test --workspace --all-features
+cargo clippy --workspace --all-targets --all-features
 cargo fmt
 ```
 
 ## Not modelled yet
 
-Movement (jump types, sprint, slide), exotic and weapon-perk catalogues,
-aspects/fragments, intrinsic burst fire for pulse rifles, PvP flinch and aim
-assist, and a C FFI layer. The modifier and status systems are data-driven,
-so most perks and fragments can be expressed as a `Modifier` or a
-`StatusDef` without code changes.
+Movement itself (jump types, sprint, slide: the sandbox only reports
+movement requests), fragments, exotic armor and weapon-perk catalogues,
+Prismatic's Transcendence, verbs that leave pickups (Firesprites, Ionic
+Traces, Stasis shards and Tangles are modelled as direct effects), intrinsic
+burst fire for pulse rifles, and PvP flinch and aim assist. The modifier,
+status and effect systems are data-driven, so most perks and fragments can
+be written as a `Modifier`, `StatusDef` or aspect passive without code
+changes.

@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- /head-skeleton -->
+<title>Guardian Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Chakra+Petch:wght@500;600;700&display=swap">
+<style>
+/* Layout: a one-screen tactical HUD. Arena canvas on top, control deck under it,
+   loadout + combat log in a side rail on wide screens. Deliberately dark-only. */
+:root {
+  --bg: #0c1220;
+  --panel: #141c2d;
+  --panel-2: #1a2438;
+  --line: #2a3650;
+  --fg: #ebe6d9;
+  --muted: #8e99b0;
+  --gold: #d9b45c;
+  --danger: #e2584f;
+  --special: #6fd08c;
+  --heavy: #b77ae6;
+
+  --kinetic: #d9d4c7;
+  --arc: #7cc9f2;
+  --solar: #f0923c;
+  --void: #a982e2;
+  --stasis: #5d8ff2;
+  --strand: #42c28a;
+  --prismatic: #ee7fc4;
+
+  --display: "Chakra Petch", "Barlow", "Segoe UI", system-ui, sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.45 var(--body);
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; margin: 0; text-wrap: balance; letter-spacing: .02em; }
+.label { font: 600 11px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+.app { min-height: 100%; display: flex; flex-direction: column; padding-inline: 16px; padding-block: 12px 20px; gap: 12px; max-width: 1500px; margin: 0 auto; }
+.topbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand h1 { font-size: 22px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.brand h1 span { color: var(--gold); }
+.brand p { margin: 0; color: var(--muted); font-size: 13px; }
+.topbar .spacer { flex: 1; }
+.btn {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 6px;
+  padding: 8px 14px; cursor: pointer; font: 600 13px/1 var(--display); letter-spacing: .08em; text-transform: uppercase;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--gold); border-color: var(--gold); color: #1a1406; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+
+/* ---------- Loadout picker ---------- */
+.picker { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.picker > * { min-width: 0; }
+.rail { display: flex; flex-direction: column; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; position: sticky; top: env(safe-area-inset-top, 0px); }
+.choices { display: flex; flex-direction: column; gap: 18px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg.six { grid-template-columns: repeat(3, 1fr); }
+.chip {
+  border: 1px solid var(--line); background: var(--panel-2); border-radius: 6px; padding: 9px 8px; cursor: pointer;
+  font: 600 13px/1.1 var(--display); letter-spacing: .05em; text-align: center; position: relative;
+}
+.chip[aria-pressed="true"] { border-color: var(--c, var(--gold)); box-shadow: inset 0 0 0 1px var(--c, var(--gold)); color: var(--c, var(--gold)); }
+.chip .sw { display: block; height: 3px; border-radius: 2px; background: var(--c); margin: 6px auto 0; width: 60%; }
+.summary { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.summary div { display: flex; justify-content: space-between; gap: 10px; }
+.summary dt { color: var(--muted); }
+.summary dd { margin: 0; text-align: right; font-weight: 600; }
+.slot h2 { font-size: 15px; display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+.slot h2 small { font: 500 12px var(--body); color: var(--muted); letter-spacing: 0; }
+.opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.opt {
+  text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 10px 12px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+.opt:hover { border-color: var(--muted); }
+.opt b { font: 600 14px/1.2 var(--display); letter-spacing: .02em; display: flex; align-items: center; gap: 7px; }
+.opt b::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.opt span { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.opt[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, var(--panel)); }
+.opt[aria-pressed="true"] span { color: var(--fg); }
+.note { color: var(--muted); font-size: 13px; margin: 0; }
+
+/* ---------- Play screen ---------- */
+.play { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
+.play > * { min-width: 0; }
+.stagewrap { display: flex; flex-direction: column; gap: 10px; }
+.stage {
+  position: relative; width: 100%; aspect-ratio: 8 / 5; max-width: 100%;
+  max-height: calc(100dvh - 230px); min-height: 220px;
+  margin: 0 auto; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #0a0f1b;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+.vitals { position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 4px; width: min(220px, 45%); pointer-events: none; }
+.bar { height: 7px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; position: relative; }
+.bar i { position: absolute; inset: 0 auto 0 0; display: block; }
+.bar.hp i { background: var(--fg); }
+.bar.sh i { background: var(--gold); }
+.bar.os i { background: #d9e8ff; }
+.wavebox { position: absolute; right: 10px; top: 8px; text-align: right; pointer-events: none; }
+.wavebox b { font: 700 20px/1 var(--display); letter-spacing: .06em; display: block; }
+.wavebox span { font-size: 12px; color: var(--muted); }
+.hint { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: rgba(12,18,32,.85); border: 1px solid var(--line); padding: 6px 12px; border-radius: 6px; font: 600 13px var(--display); letter-spacing: .04em; white-space: nowrap; pointer-events: none; }
+.over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(8,12,22,.78); text-align: center; padding: 16px; }
+.over h2 { font-size: 32px; letter-spacing: .1em; text-transform: uppercase; color: var(--danger); }
+.over .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.joy { position: absolute; width: 96px; height: 96px; border-radius: 50%; border: 2px solid rgba(235,230,217,.35); pointer-events: none; transform: translate(-50%, -50%); }
+.joy i { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px; border-radius: 50%; background: rgba(235,230,217,.4); }
+
+.deck { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+.weapons { display: flex; gap: 6px; flex: 1 1 300px; min-width: 0; }
+.wpn {
+  flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 8px 10px; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 3px; border-top: 3px solid var(--ammo);
+}
+.wpn[aria-pressed="true"] { border-color: var(--gold); border-top-color: var(--ammo); background: var(--panel-2); }
+.wpn b { font: 600 13px/1.1 var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wpn span { font-size: 12px; color: var(--muted); }
+.wpn em { font-style: normal; font-size: 11px; color: var(--gold); }
+.abilities { display: flex; gap: 8px; flex: 1 1 360px; }
+.ab {
+  flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); cursor: pointer; padding: 8px 6px 7px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center;
+}
+.ab .ring { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--c) calc(var(--p) * 1turn), rgba(255,255,255,.07) 0); }
+.ab .ring b { width: 36px; height: 36px; border-radius: 50%; background: var(--panel); display: grid; place-items: center; font: 700 14px var(--display); }
+.ab.ready .ring b { background: var(--c); color: #0c1220; }
+.ab small { font-size: 11px; color: var(--muted); line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ab kbd { font: 600 10px var(--display); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 1px 4px; }
+.ab.super { flex: 1.3; }
+.ab.super.active { border-color: var(--c); box-shadow: 0 0 0 1px var(--c) inset; }
+
+.side { display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.card h3 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.kit { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.kit div { display: flex; justify-content: space-between; gap: 8px; }
+.kit span { color: var(--muted); }
+.kit b { font-weight: 600; text-align: right; }
+.tags { display: flex; gap: 5px; flex-wrap: wrap; min-height: 22px; }
+.tag { font: 600 11px/1 var(--display); letter-spacing: .05em; padding: 5px 7px; border-radius: 4px; background: color-mix(in srgb, var(--c, var(--muted)) 18%, transparent); color: var(--c, var(--fg)); }
+.log { margin: 0; padding: 0; list-style: none; font-size: 13px; display: flex; flex-direction: column; gap: 3px; min-height: 120px; }
+.log li { color: var(--muted); }
+.log li:last-child { color: var(--fg); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; margin: 0; }
+.keys dt { font: 600 12px var(--display); color: var(--gold); }
+.keys dd { margin: 0; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--c); margin-right: 5px; vertical-align: -1px; }
+.status { color: var(--muted); padding: 40px 0; text-align: center; font: 600 14px var(--display); letter-spacing: .08em; }
+.error { color: var(--danger); white-space: pre-wrap; font-size: 13px; }
+
+@media (max-width: 1100px) {
+  .play { grid-template-columns: minmax(0, 1fr); }
+  .side { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+}
+@media (max-width: 760px) {
+  .picker { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: static; }
+  .stage { max-height: none; }
+  .brand p { display: none; }
+  .ab { padding: 6px 4px; }
+  .ab .ring { width: 40px; height: 40px; }
+  .ab .ring b { width: 31px; height: 31px; font-size: 12px; }
+  .ab kbd { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<!-- body-skeleton -->
+</head>
+<body>
+<!-- /body-skeleton -->
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>Guardian <span>Arena</span></h1>
+      <p>Destiny 2 combat rules in Rust, running in your browser.</p>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="btnLoadout" hidden>Change loadout</button>
+    <button class="btn" id="btnAuto" aria-pressed="false" hidden title="Aim at the nearest enemy and fire automatically (T)">Auto-aim</button>
+  </header>
+
+  <main id="loading" class="status">Loading the combat sandbox…</main>
+
+  <main id="picker" class="picker" hidden>
+    <aside class="rail">
+      <div>
+        <div class="label">Class</div>
+        <div class="seg" id="classes" style="margin-top:8px"></div>
+      </div>
+      <div>
+        <div class="label">Subclass</div>
+        <div class="seg six" id="elements" style="margin-top:8px"></div>
+      </div>
+      <dl class="summary" id="summary"></dl>
+      <button class="btn primary" id="btnDeploy">Deploy</button>
+      <p class="note">Waves of Hive and champions. Champions need the right counter: the Hand Cannon breaks Barriers, the Shotgun stops Overloads, rockets stun Unstoppables, and some verbs stun them too.</p>
+    </aside>
+    <section class="choices" id="choices"></section>
+  </main>
+
+  <main id="play" class="play" hidden>
+    <div class="stagewrap">
+      <div class="stage" id="stage">
+        <canvas id="cv"></canvas>
+        <div class="vitals">
+          <div class="bar os"><i id="osBar"></i></div>
+          <div class="bar sh"><i id="shBar"></i></div>
+          <div class="bar hp"><i id="hpBar"></i></div>
+        </div>
+        <div class="wavebox"><b id="waveText" class="num">WAVE 1</b><span id="killText" class="num">0 kills</span></div>
+        <div class="hint" id="hint" hidden></div>
+        <div class="joy" id="joy" hidden><i id="joyKnob"></i></div>
+        <div class="over" id="over" hidden>
+          <h2>Guardian down</h2>
+          <p id="overText" class="num"></p>
+          <div class="row">
+            <button class="btn primary" id="btnRetry">Try again</button>
+            <button class="btn" id="btnBack">Change loadout</button>
+          </div>
+        </div>
+      </div>
+      <div class="deck">
+        <div class="weapons" id="weapons"></div>
+        <div class="abilities" id="abilities"></div>
+      </div>
+    </div>
+    <aside class="side">
+      <section class="card">
+        <h3>Loadout</h3>
+        <div class="kit" id="kit"></div>
+        <div class="tags" id="buffs"></div>
+      </section>
+      <section class="card">
+        <h3>Combat log</h3>
+        <ul class="log" id="log"></ul>
+      </section>
+      <section class="card">
+        <h3>Controls</h3>
+        <dl class="keys">
+          <dt>WASD</dt><dd>Move</dd>
+          <dt>Mouse</dt><dd>Aim, click to fire</dd>
+          <dt>Q · E · Shift</dt><dd>Grenade · Melee · Class ability</dd>
+          <dt>F</dt><dd>Super. In a super, click attacks and F is the heavy attack</dd>
+          <dt>Right-click</dt><dd>Super heavy attack (also Space)</dd>
+          <dt>1 · 2 · 3</dt><dd>Hand Cannon · Shotgun · Rockets</dd>
+          <dt>R · T</dt><dd>Reload · Auto-aim</dd>
+        </dl>
+        <p class="note">On a phone: drag on the arena to move. Auto-aim fires for you; tap the ability buttons.</p>
+        <div class="legend">
+          <span style="--c:var(--special)">Special ammo</span>
+          <span style="--c:var(--heavy)">Heavy ammo</span>
+          <span style="--c:var(--gold)">Orb of Power</span>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+"use strict";
+const EL = { Kinetic: "--kinetic", Arc: "--arc", Solar: "--solar", Void: "--void", Stasis: "--stasis", Strand: "--strand", Prismatic: "--prismatic" };
+const css = getComputedStyle(document.documentElement);
+const color = (name) => css.getPropertyValue(EL[name] || name).trim() || "#ccc";
+const STATUS_EL = {
+  Scorch: "Solar", Radiant: "Solar", Restoration: "Solar",
+  Jolt: "Arc", Blind: "Arc", Amplified: "Arc",
+  Volatile: "Void", Weaken: "Void", Suppress: "Void", Devour: "Void", Invisible: "Void",
+  Slow: "Stasis", Frozen: "Stasis", "Frost Armor": "Stasis",
+  Sever: "Strand", Suspend: "Strand", Unravel: "Strand", "Woven Mail": "Strand",
+};
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+// ---------- WebAssembly bridge ----------
+let W = null;
+const dec = new TextDecoder(), enc = new TextEncoder();
+const readOut = (ptr) => dec.decode(new Uint8Array(W.memory.buffer, ptr, W.out_len()));
+function call(fn) {
+  try { return fn(); }
+  catch (err) {
+    let msg = String(err);
+    try { msg = readOut(W.last_error()) || msg; } catch {}
+    fail(msg);
+    throw err;
+  }
+}
+function fail(msg) {
+  running = false;
+  const el = $("loading");
+  el.hidden = false;
+  el.innerHTML = "";
+  const p = document.createElement("p");
+  p.className = "error";
+  p.textContent = "The sandbox stopped: " + msg;
+  el.appendChild(p);
+}
+
+// ---------- Loadout picker ----------
+let catalog = [];
+let pick = store.get("arena.loadout") || null;
+
+function kitFor(c, e) { return catalog.find((k) => k.class === c && k.element === e); }
+function defaults(c, e) {
+  const k = kitFor(c, e);
+  return { class: c, element: e, super: k.supers[0].name, grenade: k.grenades[0].name, melee: k.melees[0].name,
+           class_ability: k.class_abilities[0].name, aspects: k.aspects.slice(0, 2).map((a) => a.name) };
+}
+function validPick(p) {
+  const k = p && kitFor(p.class, p.element);
+  if (!k) return false;
+  const has = (list, n) => list.some((o) => o.name === n);
+  return has(k.supers, p.super) && has(k.grenades, p.grenade) && has(k.melees, p.melee) &&
+    has(k.class_abilities, p.class_ability) && p.aspects.every((a) => has(k.aspects, a));
+}
+
+function chip(text, pressed, c, onClick) {
+  const b = document.createElement("button");
+  b.className = "chip";
+  b.setAttribute("aria-pressed", String(pressed));
+  if (c) { b.style.setProperty("--c", color(c)); }
+  b.textContent = text;
+  if (c) { const s = document.createElement("i"); s.className = "sw"; b.appendChild(s); }
+  b.onclick = onClick;
+  return b;
+}
+
+function renderPicker() {
+  const classes = $("classes"); classes.innerHTML = "";
+  for (const c of ["Titan", "Hunter", "Warlock"]) {
+    classes.appendChild(chip(c, pick.class === c, null, () => { pick = defaults(c, pick.element); renderPicker(); }));
+  }
+  const els = $("elements"); els.innerHTML = "";
+  for (const e of ["Arc", "Solar", "Void", "Stasis", "Strand", "Prismatic"]) {
+    els.appendChild(chip(e, pick.element === e, e, () => { pick = defaults(pick.class, e); renderPicker(); }));
+  }
+  const k = kitFor(pick.class, pick.element);
+  const sum = $("summary"); sum.innerHTML = "";
+  for (const [label, val] of [["Super", pick.super], ["Grenade", pick.grenade], ["Melee", pick.melee], ["Class", pick.class_ability], ["Aspects", pick.aspects.join(", ") || "None"]]) {
+    const d = document.createElement("div");
+    d.innerHTML = "<dt></dt><dd></dd>";
+    d.children[0].textContent = label; d.children[1].textContent = val;
+    sum.appendChild(d);
+  }
+  const root = $("choices"); root.innerHTML = "";
+  const slots = [
+    ["super", "Super", k.supers, "One"],
+    ["grenade", "Grenade", k.grenades, "One"],
+    ["melee", "Melee", k.melees, "One"],
+    ["class_ability", "Class ability", k.class_abilities, "One"],
+    ["aspects", "Aspects", k.aspects, "Up to two"],
+  ];
+  for (const [key, title, options, count] of slots) {
+    const sec = document.createElement("section"); sec.className = "slot";
+    const h = document.createElement("h2"); h.textContent = title;
+    const sm = document.createElement("small"); sm.textContent = count; h.appendChild(sm);
+    sec.appendChild(h);
+    const grid = document.createElement("div"); grid.className = "opts";
+    for (const o of options) {
+      const b = document.createElement("button"); b.className = "opt";
+      b.style.setProperty("--c", color(o.el));
+      const selected = key === "aspects" ? pick.aspects.includes(o.name) : pick[key] === o.name;
+      b.setAttribute("aria-pressed", String(selected));
+      const t = document.createElement("b"); t.textContent = o.name;
+      const d = document.createElement("span"); d.textContent = o.description;
+      b.append(t, d);
+      b.onclick = () => {
+        if (key === "aspects") {
+          const i = pick.aspects.indexOf(o.name);
+          if (i >= 0) pick.aspects.splice(i, 1);
+          else { pick.aspects.push(o.name); if (pick.aspects.length > 2) pick.aspects.shift(); }
+        } else pick[key] = o.name;
+        renderPicker();
+      };
+      grid.appendChild(b);
+    }
+    sec.appendChild(grid);
+    root.appendChild(sec);
+  }
+}
+
+// ---------- Game ----------
+const cv = $("cv"), ctx = cv.getContext("2d");
+let state = null, running = false, last = 0;
+const coarse = matchMedia("(pointer: coarse)").matches;
+let auto = coarse;
+const keys = new Set();
+let mouse = { x: 0, y: 0, down: false };
+let joy = null;          // { id, ox, oy, x, y }
+let view = { s: 1, ox: 0, oy: 0 };
+
+function setAuto(v) { auto = v; $("btnAuto").setAttribute("aria-pressed", String(v)); }
+
+function startGame() {
+  const json = JSON.stringify(pick);
+  const b = enc.encode(json);
+  const ok = call(() => {
+    const p = W.alloc(b.length);
+    new Uint8Array(W.memory.buffer, p, b.length).set(b);
+    const r = W.game_new(p, b.length);
+    W.dealloc(p, b.length);
+    return r;
+  });
+  if (!ok) { fail(readOut(W.last_error())); return; }
+  store.set("arena.loadout", pick);
+  $("picker").hidden = true; $("play").hidden = false; $("loading").hidden = true;
+  $("btnLoadout").hidden = false; $("btnAuto").hidden = false; $("over").hidden = true;
+  setAuto(auto);
+  buildDeck();
+  resize();
+  running = true; last = performance.now();
+  requestAnimationFrame(frame);
+}
+
+function showPicker() {
+  running = false;
+  $("play").hidden = true; $("picker").hidden = false;
+  $("btnLoadout").hidden = true; $("btnAuto").hidden = true;
+  renderPicker();
+}
+
+const SLOT_KEYS = { Grenade: ["Q", 1], Melee: ["E", 2], "Class ability": ["Shift", 3], Super: ["F", 4] };
+let deckEls = null;
+function buildDeck() {
+  call(() => W.game_tick(0));
+  state = JSON.parse(call(() => readOut(W.game_state())));
+  const wr = $("weapons"); wr.innerHTML = "";
+  const wEls = state.player.weapons.map((w, i) => {
+    const b = document.createElement("button"); b.className = "wpn";
+    b.style.setProperty("--ammo", w.ammo === "Primary" ? "var(--kinetic)" : w.ammo === "Special" ? "var(--special)" : "var(--heavy)");
+    b.innerHTML = "<b></b><span class='num'></span><em></em>";
+    b.children[0].textContent = (i + 1) + "  " + w.name;
+    b.children[2].textContent = w.anti ? "Anti-" + w.anti : "";
+    b.onclick = () => call(() => W.game_command(7 + i));
+    wr.appendChild(b);
+    return b;
+  });
+  const ar = $("abilities"); ar.innerHTML = "";
+  const order = ["Grenade", "Melee", "Class ability", "Super"];
+  const aEls = order.map((slot) => {
+    const a = state.player.abilities.find((x) => x.slot === slot);
+    const b = document.createElement("button");
+    b.className = "ab" + (slot === "Super" ? " super" : "");
+    b.style.setProperty("--c", color(a ? a.el : "Kinetic"));
+    b.innerHTML = "<div class='ring'><b></b></div><small></small><kbd></kbd>";
+    b.querySelector("small").textContent = a ? a.name : slot;
+    b.querySelector("kbd").textContent = SLOT_KEYS[slot][0];
+    b.onclick = () => {
+      const inSuper = state && state.player.super_mode;
+      call(() => W.game_command(slot === "Super" && inSuper ? 5 : SLOT_KEYS[slot][1]));
+    };
+    ar.appendChild(b);
+    return b;
+  });
+  const kit = $("kit"); kit.innerHTML = "";
+  for (const [label, val] of [["Class", pick.class + " · " + pick.element], ["Super", pick.super], ["Grenade", pick.grenade], ["Melee", pick.melee], ["Class ability", pick.class_ability], ["Aspects", pick.aspects.join(", ") || "None"]]) {
+    const d = document.createElement("div"); d.innerHTML = "<span></span><b></b>";
+    d.children[0].textContent = label; d.children[1].textContent = val; kit.appendChild(d);
+  }
+  deckEls = { wEls, aEls };
+}
+
+function resize() {
+  const r = $("stage").getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  const [aw, ah] = state ? state.arena : [48, 30];
+  const s = Math.min(cv.width / aw, cv.height / ah);
+  view = { s, ox: (cv.width - aw * s) / 2, oy: (cv.height - ah * s) / 2, dpr };
+}
+window.addEventListener("resize", resize);
+
+const toWorld = (cx, cy) => {
+  const r = cv.getBoundingClientRect();
+  const px = (cx - r.left) * view.dpr, py = (cy - r.top) * view.dpr;
+  return [(px - view.ox) / view.s, (py - view.oy) / view.s];
+};
+
+// Input
+addEventListener("keydown", (e) => {
+  if (!running) return;
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  keys.add(k);
+  if (e.repeat) return;
+  let cmd = { q: 1, e: 2, Shift: 3, f: 4, " ": 5, r: 6, "1": 7, "2": 8, "3": 9 }[k];
+  if (cmd === 4 && state && state.player.super_mode) cmd = 5;
+  if (cmd) { call(() => W.game_command(cmd)); e.preventDefault(); }
+  if (k === "t") setAuto(!auto);
+});
+addEventListener("keyup", (e) => keys.delete(e.key.length === 1 ? e.key.toLowerCase() : e.key));
+addEventListener("blur", () => { keys.clear(); mouse.down = false; });
+cv.addEventListener("contextmenu", (e) => e.preventDefault());
+cv.addEventListener("pointerdown", (e) => {
+  if (!running) return;
+  cv.setPointerCapture(e.pointerId);
+  if (e.pointerType === "touch") {
+    if (!auto) setAuto(true);
+    joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY };
+    return;
+  }
+  [mouse.x, mouse.y] = toWorld(e.clientX, e.clientY);
+  if (e.button === 2) call(() => W.game_command(5));
+  else mouse.down = true;
+});
+cv.addEventListener("pointermove", (e) => {
+  if (joy && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; return; }
+  [mouse.x, mouse.y] = toWorld(e.clientX, e.clientY);
+});
+const endPointer = (e) => {
+  if (joy && e.pointerId === joy.id) joy = null;
+  if (e.pointerType !== "touch") mouse.down = false;
+};
+cv.addEventListener("pointerup", endPointer);
+cv.addEventListener("pointercancel", endPointer);
+
+function moveVector() {
+  if (joy) {
+    const dx = joy.x - joy.ox, dy = joy.y - joy.oy, l = Math.hypot(dx, dy);
+    if (l < 6) return [0, 0];
+    const m = Math.min(l, 48) / 48;
+    return [dx / l * m, dy / l * m];
+  }
+  let x = 0, y = 0;
+  if (keys.has("a") || keys.has("ArrowLeft")) x -= 1;
+  if (keys.has("d") || keys.has("ArrowRight")) x += 1;
+  if (keys.has("w") || keys.has("ArrowUp")) y -= 1;
+  if (keys.has("s") || keys.has("ArrowDown")) y += 1;
+  return [x, y];
+}
+
+function frame(now) {
+  if (!running) return;
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  const [mx, my] = moveVector();
+  call(() => {
+    W.game_input(mx, my, mouse.x, mouse.y, (mouse.down ? 1 : 0) | (auto ? 2 : 0));
+    W.game_tick(dt);
+  });
+  state = JSON.parse(call(() => readOut(W.game_state())));
+  draw();
+  updateHud();
+  requestAnimationFrame(frame);
+}
+
+// ---------- Rendering ----------
+function rgba(hex, a) {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`;
+}
+const X = (x) => view.ox + x * view.s;
+const Y = (y) => view.oy + y * view.s;
+const S = (v) => v * view.s;
+
+function circle(x, y, r) { ctx.beginPath(); ctx.arc(X(x), Y(y), Math.max(S(r), 0.5), 0, Math.PI * 2); }
+
+function draw() {
+  const st = state, s = view.s, dpr = view.dpr;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#0a0f1b"; ctx.fillRect(0, 0, cv.width, cv.height);
+  // Floor grid, 2 m squares.
+  const [aw, ah] = st.arena;
+  ctx.fillStyle = "#0e1526"; ctx.fillRect(X(0), Y(0), S(aw), S(ah));
+  ctx.strokeStyle = "rgba(142,153,176,.07)"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = 0; x <= aw; x += 2) { ctx.moveTo(X(x), Y(0)); ctx.lineTo(X(x), Y(ah)); }
+  for (let y = 0; y <= ah; y += 2) { ctx.moveTo(X(0), Y(y)); ctx.lineTo(X(aw), Y(y)); }
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(217,180,92,.35)"; ctx.lineWidth = 2 * dpr; ctx.strokeRect(X(0), Y(0), S(aw), S(ah));
+
+  // Zones
+  for (const z of st.zones) {
+    const c = color(z.el === "Kinetic" ? "--gold" : z.el);
+    circle(z.x, z.y, z.r);
+    ctx.fillStyle = rgba(c, z.friendly ? 0.10 : 0.16); ctx.fill();
+    ctx.setLineDash(z.cover ? [] : [6 * dpr, 5 * dpr]);
+    ctx.lineWidth = (z.cover ? 3 : 1.5) * dpr; ctx.strokeStyle = rgba(c, 0.25 + 0.5 * z.left); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = rgba(c, 0.8); ctx.font = `600 ${11 * dpr}px "Chakra Petch", sans-serif`; ctx.textAlign = "center";
+    ctx.fillText(z.name, X(z.x), Y(z.y - z.r) - 4 * dpr);
+  }
+  // Pickups
+  for (const [p, ammo] of st.bricks) {
+    ctx.fillStyle = ammo === "Heavy" ? color("--heavy") : color("--special");
+    ctx.fillRect(X(p[0]) - S(0.35), Y(p[1]) - S(0.22), S(0.7), S(0.44));
+  }
+  const pulse = 0.6 + 0.4 * Math.sin(st.time * 6);
+  for (const o of st.orbs) {
+    circle(o[0], o[1], 0.45); ctx.fillStyle = rgba(color("--gold"), 0.25 * pulse); ctx.fill();
+    circle(o[0], o[1], 0.22); ctx.fillStyle = color("--gold"); ctx.fill();
+  }
+  // Enemies
+  for (const e of st.enemies) drawEnemy(e);
+  // Player
+  drawPlayer(st.player);
+  // Enemy shots
+  for (const [p, el] of st.projectiles) {
+    circle(p[0], p[1], 0.18); ctx.fillStyle = color(el); ctx.fill();
+  }
+  // Effects
+  for (const f of st.fx) drawFx(f);
+}
+
+function drawEnemy(e) {
+  const champ = e.champion;
+  const base = e.rank === "Boss" ? "#c9b48a" : e.rank === "Major" ? "#d1a17a" : e.name === "Thrall" ? "#a7b0a2" : "#b9a6c9";
+  ctx.lineWidth = 2 * view.dpr;
+  circle(e.x, e.y, e.r);
+  ctx.fillStyle = e.frozen ? rgba(color("Stasis"), 0.9) : base; ctx.fill();
+  if (e.shield > 0 && e.shield_el) { ctx.strokeStyle = color(e.shield_el); ctx.lineWidth = 3 * view.dpr; ctx.stroke(); }
+  if (champ) {
+    ctx.strokeStyle = e.stunned ? "#ffffff" : color("--danger"); ctx.lineWidth = 2 * view.dpr;
+    ctx.beginPath();
+    const r = S(e.r + 0.35), cx = X(e.x), cy = Y(e.y);
+    if (champ === "Barrier") { ctx.arc(cx, cy, r, 0, Math.PI * 2); }
+    else if (champ === "Overload") { for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.moveTo(cx + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8); ctx.lineTo(cx + Math.cos(a) * r * 1.2, cy + Math.sin(a) * r * 1.2); } }
+    else { ctx.moveTo(cx, cy - r * 1.2); ctx.lineTo(cx + r, cy + r * 0.8); ctx.lineTo(cx - r, cy + r * 0.8); ctx.closePath(); }
+    ctx.stroke();
+    if (e.barrier) { circle(e.x, e.y, e.r + 0.7); ctx.fillStyle = "rgba(255,255,255,.18)"; ctx.fill(); ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.stroke(); }
+  }
+  if (e.suspended) { circle(e.x, e.y - 0.15, e.r + 0.15); ctx.strokeStyle = color("Strand"); ctx.setLineDash([3 * view.dpr, 3 * view.dpr]); ctx.stroke(); ctx.setLineDash([]); }
+  // Health and shield bars
+  const w = Math.max(S(e.r * 2.2), 26 * view.dpr), h = 4 * view.dpr;
+  const bx = X(e.x) - w / 2, by = Y(e.y - e.r) - 10 * view.dpr;
+  ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(bx, by, w, h);
+  ctx.fillStyle = e.rank === "Minor" ? "#d9564e" : e.rank === "Major" ? "#e39a3c" : "#e8cc4a";
+  ctx.fillRect(bx, by, w * Math.max(0, e.health / e.max_health), h);
+  if (e.max_shield > 0 && e.shield > 0) { ctx.fillStyle = color(e.shield_el || "Kinetic"); ctx.fillRect(bx, by - h - 1, w * e.shield / e.max_shield, h); }
+  // Status dots
+  let i = 0;
+  for (const s of e.statuses) {
+    if (s === "Frozen") continue;
+    ctx.fillStyle = color(STATUS_EL[s] || "Kinetic");
+    ctx.beginPath(); ctx.arc(bx + 3 * view.dpr + i * 8 * view.dpr, by + h + 5 * view.dpr, 2.6 * view.dpr, 0, Math.PI * 2); ctx.fill();
+    i++;
+  }
+  if (e.rank !== "Minor") {
+    ctx.fillStyle = "rgba(235,230,217,.85)"; ctx.font = `600 ${10 * view.dpr}px "Chakra Petch", sans-serif`; ctx.textAlign = "center";
+    ctx.fillText(e.name, X(e.x), by - (e.max_shield > 0 ? 8 : 4) * view.dpr);
+  }
+}
+
+function drawPlayer(p) {
+  const c = color(p.element);
+  ctx.globalAlpha = p.invisible ? 0.35 : 1;
+  // Aim line
+  const ax = state.aim[0], ay = state.aim[1];
+  ctx.strokeStyle = rgba(c, 0.35); ctx.lineWidth = 1 * view.dpr; ctx.setLineDash([4 * view.dpr, 6 * view.dpr]);
+  ctx.beginPath(); ctx.moveTo(X(p.x), Y(p.y)); ctx.lineTo(X(ax), Y(ay)); ctx.stroke(); ctx.setLineDash([]);
+  if (p.super_mode) { circle(p.x, p.y, p.r + 0.6); ctx.fillStyle = rgba(color(p.super_mode.el), 0.25); ctx.fill(); }
+  circle(p.x, p.y, p.r); ctx.fillStyle = c; ctx.fill();
+  ctx.strokeStyle = "#ebe6d9"; ctx.lineWidth = 2 * view.dpr; ctx.stroke();
+  if (p.overshield > 0) { circle(p.x, p.y, p.r + 0.25); ctx.strokeStyle = "rgba(217,232,255,.9)"; ctx.stroke(); }
+  ctx.fillStyle = "#0c1220"; ctx.font = `700 ${S(0.6)}px "Chakra Petch", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(p.class[0], X(p.x), Y(p.y) + 1);
+  ctx.textBaseline = "alphabetic";
+  ctx.globalAlpha = 1;
+}
+
+function drawFx(f) {
+  const t = f.age / f.life, a = 1 - t, dpr = view.dpr;
+  const c = f.el ? color(f.el) : "#ebe6d9";
+  switch (f.kind) {
+    case "blast":
+      circle(f.x, f.y, f.r * (0.4 + 0.6 * t)); ctx.fillStyle = rgba(c, 0.25 * a); ctx.fill();
+      ctx.strokeStyle = rgba(c, 0.8 * a); ctx.lineWidth = 2 * dpr; ctx.stroke(); break;
+    case "beam": case "tracer": case "dash":
+      ctx.strokeStyle = f.kind === "dash" ? `rgba(235,230,217,${0.4 * a})` : rgba(c, (f.kind === "tracer" ? 0.7 : 0.9) * a);
+      ctx.lineWidth = (f.kind === "beam" ? 3 : f.kind === "dash" ? 6 : 1.5) * dpr;
+      ctx.beginPath(); ctx.moveTo(X(f.x), Y(f.y)); ctx.lineTo(X(f.x2), Y(f.y2)); ctx.stroke(); break;
+    case "slash":
+      circle(f.x, f.y, f.r); ctx.strokeStyle = `rgba(226,88,79,${a})`; ctx.lineWidth = 3 * dpr; ctx.stroke(); break;
+    case "death":
+      circle(f.x, f.y, f.r * (1 + t)); ctx.strokeStyle = `rgba(235,230,217,${0.6 * a})`; ctx.lineWidth = 2 * dpr; ctx.stroke(); break;
+    case "dmg": case "hurt": case "text": {
+      const rise = S(0.8) * t;
+      const size = (f.kind === "text" ? 12 : f.crit ? 15 : 12) * dpr;
+      ctx.font = `700 ${size}px "Chakra Petch", sans-serif`; ctx.textAlign = "center";
+      ctx.fillStyle = f.kind === "hurt" ? `rgba(226,88,79,${a})` : f.crit ? `rgba(240,212,92,${a})` : f.kind === "text" ? rgba(f.el ? c : "#ebe6d9", a) : `rgba(235,230,217,${a})`;
+      ctx.fillText(f.text, X(f.x), Y(f.y) - rise); break;
+    }
+    case "banner": {
+      ctx.font = `700 ${Math.max(22 * dpr, S(1.6))}px "Chakra Petch", sans-serif`; ctx.textAlign = "center";
+      ctx.fillStyle = `rgba(217,180,92,${Math.min(1, a * 2)})`;
+      ctx.fillText(f.text, X(f.x), Y(f.y) - S(2)); break;
+    }
+  }
+}
+
+// ---------- HUD ----------
+function updateHud() {
+  const p = state.player;
+  $("hpBar").style.width = (100 * p.health / p.max_health) + "%";
+  $("shBar").style.width = (100 * p.shield / Math.max(1, p.max_shield)) + "%";
+  $("osBar").style.width = (100 * Math.min(1, p.overshield / 100)) + "%";
+  $("waveText").textContent = "WAVE " + Math.max(1, state.wave);
+  $("killText").textContent = state.kills + " kills";
+  const hint = $("hint");
+  if (state.hint) { hint.hidden = false; hint.textContent = state.hint; } else hint.hidden = true;
+
+  p.weapons.forEach((w, i) => {
+    const el = deckEls.wEls[i]; if (!el) return;
+    el.setAttribute("aria-pressed", String(w.active));
+    el.children[1].textContent = w.reloading ? "Reloading…" : `${w.mag} | ${w.reserves == null ? "∞" : w.reserves}`;
+  });
+  const order = ["Grenade", "Melee", "Class ability", "Super"];
+  order.forEach((slot, i) => {
+    const a = p.abilities.find((x) => x.slot === slot), el = deckEls.aEls[i];
+    if (!a || !el) return;
+    const sm = slot === "Super" && p.super_mode;
+    el.classList.toggle("active", !!sm);
+    const ready = a.charges > 0;
+    el.classList.toggle("ready", ready && !sm);
+    el.style.setProperty("--p", sm ? (p.super_mode.remaining / p.super_mode.duration).toFixed(3) : (a.charges >= a.max ? 1 : a.progress).toFixed(3));
+    const label = el.querySelector(".ring b");
+    label.textContent = sm ? (p.super_mode.heavy ? "HVY" : "ON") : a.max > 1 ? `${a.charges}` : ready ? "✓" : Math.floor(a.progress * 100) + "";
+    el.querySelector("small").textContent = sm ? (p.super_mode.heavy ? "Heavy: " + p.super_mode.heavy : p.super_mode.light + (p.super_mode.uses_left != null ? ` ×${p.super_mode.uses_left}` : "")) : a.name;
+  });
+
+  const buffs = $("buffs");
+  const tags = [...p.statuses.map((s) => [s, STATUS_EL[s]]), ...p.buffs.map((b) => [b, null])];
+  const sig = tags.map((t) => t[0]).join("|");
+  if (buffs.dataset.sig !== sig) {
+    buffs.dataset.sig = sig; buffs.innerHTML = "";
+    for (const [name, el] of tags) {
+      const t = document.createElement("span"); t.className = "tag"; t.textContent = name;
+      if (el) t.style.setProperty("--c", color(el));
+      buffs.appendChild(t);
+    }
+  }
+  const log = $("log"), lsig = state.log.join("|");
+  if (log.dataset.sig !== lsig) {
+    log.dataset.sig = lsig; log.innerHTML = "";
+    for (const line of state.log) { const li = document.createElement("li"); li.textContent = line; log.appendChild(li); }
+  }
+  const joyEl = $("joy");
+  if (joy) {
+    const r = $("stage").getBoundingClientRect();
+    joyEl.hidden = false;
+    joyEl.style.left = (joy.ox - r.left) + "px"; joyEl.style.top = (joy.oy - r.top) + "px";
+    const dx = joy.x - joy.ox, dy = joy.y - joy.oy, l = Math.hypot(dx, dy), m = Math.min(l, 48);
+    $("joyKnob").style.transform = l > 0 ? `translate(${dx / l * m}px, ${dy / l * m}px)` : "";
+  } else joyEl.hidden = true;
+  if (state.game_over && $("over").hidden) {
+    $("over").hidden = false;
+    $("overText").textContent = `Reached wave ${state.wave} with ${state.kills} kills.`;
+  }
+}
+
+$("btnDeploy").onclick = startGame;
+$("btnRetry").onclick = startGame;
+$("btnBack").onclick = showPicker;
+$("btnLoadout").onclick = showPicker;
+$("btnAuto").onclick = () => setAuto(!auto);
+
+// ---------- Boot ----------
+(async () => {
+  try {
+    const res = await fetch("guardian_arena.wasm");
+    if (!res.ok) throw new Error("couldn't load guardian_arena.wasm (" + res.status + ")");
+    const { instance } = await WebAssembly.instantiate(await res.arrayBuffer(), {});
+    W = instance.exports;
+    catalog = JSON.parse(call(() => readOut(W.catalog_json())));
+    if (!validPick(pick)) pick = defaults("Warlock", "Solar");
+    $("loading").hidden = true;
+    showPicker();
+  } catch (err) {
+    fail(err.message || String(err));
+  }
+})();
+</script>
+<!-- end-skeleton -->
+</body>
+</html>

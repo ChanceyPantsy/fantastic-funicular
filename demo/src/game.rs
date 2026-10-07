@@ -16,7 +16,7 @@ use guardian_combat::effect::MoveKind;
 use guardian_combat::element::{DamageType, GuardianClass, SubclassElement};
 use guardian_combat::sandbox::{AbilityTarget, ActionError, CombatEvent, Sandbox, Shot};
 use guardian_combat::stats::{Curve, StatBlock};
-use guardian_combat::status::StatusKind;
+use guardian_combat::status::{StatusKind, TriggerKind};
 use guardian_combat::weapon::{presets, AmmoType, FireError, WeaponArchetype};
 use serde::{Deserialize, Serialize};
 
@@ -856,7 +856,7 @@ impl Game {
                 CombatEvent::Triggered { kind, origin, .. } => {
                     if let Some(p) = self.pos(origin) {
                         let mut fx = Fx::new("text", p[0], p[1] - 1.2, 0.9);
-                        fx.text = format!("{kind:?}").to_uppercase();
+                        fx.text = trigger_name(kind).to_uppercase();
                         self.fx.push(fx);
                     }
                 }
@@ -1099,6 +1099,16 @@ impl Game {
             log: self.log.iter().cloned().collect(),
             hint: self.hint.as_ref().map(|h| h.0.clone()),
         }
+    }
+}
+
+fn trigger_name(k: TriggerKind) -> &'static str {
+    match k {
+        TriggerKind::Ignite => "Ignite",
+        TriggerKind::JoltChain => "Jolt",
+        TriggerKind::VolatileExplosion => "Volatile",
+        TriggerKind::Shatter => "Shatter",
+        TriggerKind::UnravelThreads => "Unravel",
     }
 }
 
