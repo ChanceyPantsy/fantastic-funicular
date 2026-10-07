@@ -121,6 +121,45 @@ The demo talks to Rust through a plain C ABI (`demo/src/lib.rs`): no
 wasm-bindgen, just `extern "C"` functions plus JSON in and out. A Unity,
 Unreal or Godot plugin can use the same interface.
 
+## 3D demo: Guardian Strike
+
+`demo3d/` is a first-person 3D shooter built on [Bevy](https://bevy.org) 0.19
+and this crate, playable in the browser (WebGL2) or natively.
+
+- Pick any class, subclass, super, grenade, melee, class ability and two
+  aspects, then hold a lunar Hive ruin against waves of Thralls, Acolytes,
+  Wizards, shielded Knights, all three champion types and an Ogre every fifth
+  wave.
+- First person with a hand cannon, shotgun and rocket launcher (recoil,
+  reloads, aiming down sights, headshots), switching to third person for
+  roaming supers, cast supers like Nova Bomb and Well of Radiance, and death.
+- Class jumps (Hunter double jump, Titan lift, Warlock glide), sprint, dodges,
+  lunges, slams and grapples.
+- Animated characters: enemies rise from the ground, run, attack, flinch and
+  collapse; your class model runs, casts and attacks in third person.
+- Ability effects, elemental shields, status auras (frozen, suspended,
+  scorched, jolted...), champion barriers, damage numbers, and a HUD laid out
+  like Destiny's (radar, health, abilities, super, weapons, boss bar).
+
+```sh
+# Browser build (needs wasm-bindgen-cli 0.2.129; wasm-opt optional)
+./demo3d/build.sh                        # optimized, into demo3d/dist
+python3 -m http.server -d demo3d/dist 8080
+
+# Native
+cargo run -p guardian_strike --release -- titan arc
+```
+
+Controls: WASD move, Space jump (hold in the air for your class jump), Shift
+sprint, mouse aim, left click fire, right click aim down sights, Q grenade,
+E melee, C class ability, F super (in a super: left click attacks, right click
+heavy), 1/2/3 weapons, R reload, Esc release the mouse, L loadout.
+
+Characters and animations are [KayKit](https://kaylousberg.com) packs by Kay
+Lousberg (CC0); `demo3d/tools/prepare_assets.sh` rebuilds the trimmed copies
+in `demo3d/assets/models`. The HUD font is Chakra Petch (SIL Open Font
+License). Guns, the arena and all effects are built in code.
+
 ## Examples
 
 ```sh

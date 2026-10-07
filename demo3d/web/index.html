@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- /head-skeleton -->
+<title>Guardian Strike</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Chakra+Petch:wght@500;600;700&display=swap">
+<style>
+/* Layout: the game canvas fills the window; loading screen and loadout
+   picker float over it. Deliberately dark-only, like the game. */
+:root {
+  --bg: #070b14;
+  --panel: rgba(16, 23, 37, 0.92);
+  --panel-2: #1a2438;
+  --line: #2a3650;
+  --fg: #ebe6d9;
+  --muted: #8e99b0;
+  --gold: #d9b45c;
+  --danger: #e2584f;
+  --kinetic: #ebe5d6;
+  --arc: #74d1ff;
+  --solar: #ff8c26;
+  --void: #b373ff;
+  --stasis: #598cff;
+  --strand: #40f28c;
+  --prismatic: #f280cc;
+  --display: "Chakra Petch", "Barlow", "Segoe UI", system-ui, sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); overflow: hidden; }
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+.label { font: 600 11px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+h1, h2 { font-family: var(--display); margin: 0; letter-spacing: .04em; text-wrap: balance; }
+
+.screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding-inline: 16px; padding-block: 16px; }
+.loading { background: radial-gradient(ellipse at 50% 30%, #13203a 0%, var(--bg) 70%); flex-direction: column; gap: 18px; text-align: center; }
+.loading h1 { font-size: clamp(32px, 6vw, 56px); text-transform: uppercase; letter-spacing: .12em; }
+.loading h1 span { color: var(--gold); }
+.loading p { margin: 0; color: var(--muted); max-width: 60ch; }
+.progress { width: min(420px, 80vw); height: 4px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .2s; }
+.error { color: var(--danger); white-space: pre-wrap; font-size: 14px; max-width: 70ch; }
+
+.picker { align-items: flex-start; overflow-y: auto; background: linear-gradient(90deg, rgba(7,11,20,.88) 0%, rgba(7,11,20,.55) 60%, rgba(7,11,20,.25) 100%); }
+.picker-inner { width: min(1200px, 100%); display: grid; grid-template-columns: minmax(0, 290px) minmax(0, 1fr); gap: 18px; margin-block: 24px; }
+.picker-inner > * { min-width: 0; }
+.rail { display: flex; flex-direction: column; gap: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; position: sticky; top: 0; backdrop-filter: blur(6px); }
+.brand h1 { font-size: 22px; text-transform: uppercase; letter-spacing: .08em; }
+.brand h1 span { color: var(--gold); }
+.brand p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+.chip { border: 1px solid var(--line); background: var(--panel-2); border-radius: 6px; padding: 9px 6px; cursor: pointer; font: 600 13px/1.1 var(--display); letter-spacing: .04em; text-align: center; }
+.chip[aria-pressed="true"] { border-color: var(--c, var(--gold)); box-shadow: inset 0 0 0 1px var(--c, var(--gold)); color: var(--c, var(--gold)); }
+.chip .sw { display: block; height: 3px; border-radius: 2px; background: var(--c); margin: 6px auto 0; width: 60%; }
+.btn { border: 1px solid var(--line); background: var(--panel-2); border-radius: 6px; padding: 11px 14px; cursor: pointer; font: 600 14px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; }
+.btn.primary { background: var(--gold); border-color: var(--gold); color: #1a1406; }
+.btn:hover { filter: brightness(1.08); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 13px; margin: 0; }
+.keys dt { font: 600 12px var(--display); color: var(--gold); }
+.keys dd { margin: 0; color: var(--muted); }
+.note { color: var(--muted); font-size: 12.5px; margin: 0; }
+.choices { display: flex; flex-direction: column; gap: 18px; }
+.slot h2 { font-size: 15px; display: flex; gap: 10px; align-items: baseline; margin-bottom: 8px; text-shadow: 0 1px 8px #000; }
+.slot h2 small { font: 500 12px var(--body); color: var(--muted); letter-spacing: 0; }
+.opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.opt { text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; min-width: 0; backdrop-filter: blur(4px); }
+.opt b { font: 600 14px/1.2 var(--display); display: flex; align-items: center; gap: 7px; }
+.opt b::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; box-shadow: 0 0 8px var(--c); }
+.opt span { color: var(--muted); font-size: 13px; line-height: 1.35; }
+.opt[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, var(--panel)); }
+.opt[aria-pressed="true"] span { color: var(--fg); }
+.credits { font-size: 11.5px; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--danger); color: var(--fg); padding: 10px 14px; border-radius: 8px; font-size: 14px; max-width: min(90vw, 600px); }
+@media (max-width: 800px) {
+  .picker-inner { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: static; }
+}
+</style>
+<!-- body-skeleton -->
+</head>
+<body>
+<!-- /body-skeleton -->
+<canvas id="game" tabindex="0"></canvas>
+
+<section class="screen loading" id="loading">
+  <h1>Guardian <span>Strike</span></h1>
+  <p id="loadText">Downloading the engine…</p>
+  <div class="progress"><i id="bar"></i></div>
+  <p class="note" id="coarseNote" hidden>This demo needs a keyboard and mouse. On a phone you can look around the menus, but you can't play.</p>
+</section>
+
+<section class="screen picker" id="picker" hidden>
+  <div class="picker-inner">
+    <aside class="rail">
+      <div class="brand">
+        <h1>Guardian <span>Strike</span></h1>
+        <p>Destiny 2 combat in Rust and Bevy, running in your browser.</p>
+      </div>
+      <div><div class="label">Class</div><div class="seg" id="classes"></div></div>
+      <div><div class="label">Subclass</div><div class="seg" id="elements"></div></div>
+      <button class="btn primary" id="deploy">Deploy</button>
+      <button class="btn" id="resume" hidden>Resume</button>
+      <dl class="keys">
+        <dt>WASD · Space</dt><dd>Move · jump (hold in air for your class jump)</dd>
+        <dt>Shift</dt><dd>Sprint</dd>
+        <dt>Mouse</dt><dd>Aim · left fire · right aim down sights</dd>
+        <dt>Q · E · C</dt><dd>Grenade · melee · class ability</dd>
+        <dt>F</dt><dd>Super (in a super: click attacks, right-click heavy)</dd>
+        <dt>1 2 3 · R</dt><dd>Hand Cannon, Shotgun, Rockets · reload</dd>
+        <dt>Esc · L</dt><dd>Release mouse (pauses) · this screen</dd>
+      </dl>
+      <p class="note">Champions need their counter: the Hand Cannon breaks Barriers, the Shotgun stuns Overloads, rockets stop Unstoppables. Some ability effects stun them too.</p>
+      <p class="credits">Characters and animations: KayKit by Kay Lousberg (CC0). Font: Chakra Petch (OFL). Unofficial fan project, not affiliated with Bungie.</p>
+    </aside>
+    <section class="choices" id="choices"></section>
+  </div>
+</section>
+
+<div class="toast" id="toast" hidden></div>
+
+<script type="module">
+import init, { start_match, set_paused, set_pointer_locked, catalog_json, debug_json, debug_aim, debug_charge, debug_wave } from "./guardian_strike.js";
+
+// Hook for automated play-tests (headless browsers can't take pointer lock).
+window.__strike = { set_pointer_locked, set_paused, debug: () => JSON.parse(debug_json() || "null"), aim: debug_aim, charge: debug_charge, wave: debug_wave };
+const $ = (id) => document.getElementById(id);
+const EL = { Kinetic: "--kinetic", Arc: "--arc", Solar: "--solar", Void: "--void", Stasis: "--stasis", Strand: "--strand", Prismatic: "--prismatic" };
+const css = getComputedStyle(document.documentElement);
+const color = (n) => css.getPropertyValue(EL[n] || n).trim() || "#ccc";
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const canvas = $("game");
+let catalog = [], pick = store.get("strike.loadout"), inMatch = false;
+if (matchMedia("(pointer: coarse)").matches) $("coarseNote").hidden = false;
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (t.hidden = true), 6000);
+}
+function fail(msg) {
+  $("loading").hidden = false; $("picker").hidden = true;
+  $("loadText").className = "error";
+  $("loadText").textContent = "Something went wrong: " + msg;
+}
+
+// ---- Called by the game ----
+window.guardianReady = () => { $("loading").hidden = true; showPicker(); };
+window.guardianShowLoadout = () => { document.exitPointerLock?.(); showPicker(); };
+window.guardianError = (msg) => toast(msg);
+window.guardianUnlock = () => document.exitPointerLock?.();
+
+document.addEventListener("pointerlockchange", () => set_pointer_locked(document.pointerLockElement === canvas));
+canvas.addEventListener("mousedown", () => {
+  if (inMatch && $("picker").hidden && document.pointerLockElement !== canvas) {
+    canvas.requestPointerLock?.()?.catch?.(() => {});
+  }
+});
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+// ---- Loadout picker ----
+const kitFor = (c, e) => catalog.find((k) => k.class === c && k.element === e);
+function defaults(c, e) {
+  const k = kitFor(c, e);
+  return { class: c, element: e, super: k.supers[0].name, grenade: k.grenades[0].name, melee: k.melees[0].name,
+           class_ability: k.class_abilities[0].name, aspects: k.aspects.slice(0, 2).map((a) => a.name) };
+}
+function valid(p) {
+  const k = p && kitFor(p.class, p.element);
+  if (!k) return false;
+  const has = (l, n) => l.some((o) => o.name === n);
+  return has(k.supers, p.super) && has(k.grenades, p.grenade) && has(k.melees, p.melee) && has(k.class_abilities, p.class_ability) && p.aspects.every((a) => has(k.aspects, a));
+}
+function chip(text, on, c, click) {
+  const b = document.createElement("button");
+  b.className = "chip"; b.setAttribute("aria-pressed", String(on)); b.textContent = text; b.onclick = click;
+  if (c) { b.style.setProperty("--c", color(c)); const s = document.createElement("i"); s.className = "sw"; b.appendChild(s); }
+  return b;
+}
+function render() {
+  const cl = $("classes"); cl.innerHTML = "";
+  for (const c of ["Titan", "Hunter", "Warlock"]) cl.appendChild(chip(c, pick.class === c, null, () => { pick = defaults(c, pick.element); render(); }));
+  const el = $("elements"); el.innerHTML = "";
+  for (const e of ["Arc", "Solar", "Void", "Stasis", "Strand", "Prismatic"]) el.appendChild(chip(e, pick.element === e, e, () => { pick = defaults(pick.class, e); render(); }));
+  const k = kitFor(pick.class, pick.element);
+  const root = $("choices"); root.innerHTML = "";
+  for (const [key, title, opts, count] of [["super", "Super", k.supers, "One"], ["grenade", "Grenade", k.grenades, "One"], ["melee", "Melee", k.melees, "One"], ["class_ability", "Class ability", k.class_abilities, "One"], ["aspects", "Aspects", k.aspects, "Up to two"]]) {
+    const sec = document.createElement("section"); sec.className = "slot";
+    const h = document.createElement("h2"); h.textContent = title;
+    const sm = document.createElement("small"); sm.textContent = count; h.appendChild(sm); sec.appendChild(h);
+    const grid = document.createElement("div"); grid.className = "opts";
+    for (const o of opts) {
+      const b = document.createElement("button"); b.className = "opt"; b.style.setProperty("--c", color(o.el));
+      b.setAttribute("aria-pressed", String(key === "aspects" ? pick.aspects.includes(o.name) : pick[key] === o.name));
+      const t = document.createElement("b"); t.textContent = o.name;
+      const d = document.createElement("span"); d.textContent = o.description;
+      b.append(t, d);
+      b.onclick = () => {
+        if (key === "aspects") {
+          const i = pick.aspects.indexOf(o.name);
+          if (i >= 0) pick.aspects.splice(i, 1); else { pick.aspects.push(o.name); if (pick.aspects.length > 2) pick.aspects.shift(); }
+        } else pick[key] = o.name;
+        render();
+      };
+      grid.appendChild(b);
+    }
+    sec.appendChild(grid); root.appendChild(sec);
+  }
+  $("resume").hidden = !inMatch;
+}
+function showPicker() { set_paused(true); $("picker").hidden = false; render(); }
+function hidePicker() { $("picker").hidden = true; set_paused(false); canvas.focus(); }
+
+$("deploy").onclick = () => {
+  store.set("strike.loadout", pick);
+  start_match(JSON.stringify(pick));
+  inMatch = true;
+  hidePicker();
+  canvas.requestPointerLock?.()?.catch?.(() => {});
+};
+$("resume").onclick = () => { hidePicker(); canvas.requestPointerLock?.()?.catch?.(() => {}); };
+
+// ---- Boot: download the gzipped module with progress, then start Bevy ----
+try {
+  const res = await fetch("guardian_strike_bg.wasm.gz");
+  if (!res.ok) throw new Error("couldn't download the game (" + res.status + ")");
+  const total = +res.headers.get("content-length") || 0;
+  let got = 0;
+  const counted = res.body.pipeThrough(new TransformStream({
+    transform(chunk, ctl) { got += chunk.byteLength; if (total) $("bar").style.width = (100 * got / total) + "%"; ctl.enqueue(chunk); },
+  }));
+  const bytes = await new Response(counted.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+  $("bar").style.width = "100%";
+  $("loadText").textContent = "Loading models and shaders…";
+  try { await init({ module_or_path: bytes }); }
+  catch (e) { if (!String(e).includes("Using exceptions for control flow")) throw e; }
+  catalog = JSON.parse(catalog_json());
+  if (!valid(pick)) pick = defaults("Warlock", "Solar");
+} catch (e) {
+  console.error(e);
+  fail(e.message || String(e));
+}
+</script>
+<!-- end-skeleton -->
+</body>
+</html>

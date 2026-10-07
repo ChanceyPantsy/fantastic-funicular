@@ -1,0 +1,52 @@
+[package]
+name = "guardian_strike"
+version = "0.1.0"
+edition = "2021"
+description = "First-person 3D demo of guardian_combat built on Bevy."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+guardian_combat = { path = "..", features = ["serde"] }
+bevy = { version = "0.19.1", default-features = false, features = [
+    "std",
+    "default_app",
+    "bevy_winit",
+    "x11",
+    "webgl2",
+    "multi_threaded",
+    "keyboard",
+    "mouse",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_post_process",
+    "bevy_pbr",
+    "bevy_light",
+    "bevy_camera",
+    "bevy_color",
+    "bevy_image",
+    "bevy_mesh",
+    "bevy_mikktspace",
+    "bevy_shader",
+    "bevy_material",
+    "bevy_window",
+    "bevy_gltf",
+    "bevy_animation",
+    "gltf_animation",
+    "scene",
+    "hdr",
+    "png",
+    "ktx2",
+    "zstd_rust",
+    "tonemapping_luts",
+    "bevy_text",
+    "bevy_ui",
+    "bevy_ui_render",
+    "bevy_gizmos",
+    "bevy_gizmos_render",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.129"
